@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Staff System Final</title>
+
+<style>
+body{font-family:Arial; padding:20px; background:#f5f5f5;}
+.box{background:#fff; padding:15px; margin-top:20px; border-radius:8px;}
+input,select{padding:8px; margin:5px; width:95%;}
+button{padding:8px 12px; margin:5px; cursor:pointer;}
+table{border-collapse:collapse; width:100%; margin-top:10px;}
+td,th{border:1px solid #ccc; padding:8px; text-align:center;}
+.hidden{display:none;}
+</style>
+</head>
+
+<body>
+
+<h2>Staff Management System</h2>
+
+<!-- LOGIN -->
+<div class="box" id="loginBox">
+<h3>Login</h3>
+<input id="loginMobile" placeholder="Mobile">
+<input id="loginPass" placeholder="Password">
+<button onclick="login()">Login</button>
+</div>
+
+<!-- ADMIN PANEL -->
+<div class="box hidden" id="adminPanel">
+
+<h3>Admin Panel</h3>
+
+<h4>Add Staff</h4>
+<input id="name" placeholder="Name">
+<input id="mobile" placeholder="Mobile">
+<button onclick="addStaff()">Add</button>
+
+<h4>Staff List</h4>
+<table id="staffTable"></table>
+
+<h4>Attendance</h4>
+<input type="date" id="attDate">
+<table id="attTable"></table>
+<button onclick="saveAttendance()">Save Attendance</button>
+
+<h4>Attendance Report</h4>
+<button onclick="showAttendance()">View Attendance</button>
+<div id="attendanceReport"></div>
+
+<h4>Add Job</h4>
+<input type="date" id="jobDate">
+<input id="jobName" placeholder="Job Name">
+<input id="qty" type="number" placeholder="Quantity">
+<input id="rate" type="number" placeholder="Rate">
+<button onclick="addJob()">Add Job</button>
+
+<h4>Job Report</h4>
+<button onclick="showJobs()">View Jobs</button>
+<div id="jobReport"></div>
+
+<button onclick="logout()">Logout</button>
+</div>
+
+<script>
+
+// DATA
+let staff = JSON.parse(localStorage.getItem("staff")) || [];
+let attendance = JSON.parse(localStorage.getItem("attendance")) || [];
+let jobs = JSON.parse(localStorage.getItem("jobs")) || [];
+
+// LOGIN
+function login(){
+    let m = document.getElementById("loginMobile").value;
+    let p = document.getElementById("loginPass").value;
+
+    if(m=="9310794146" && p=="Bihar@123"){
+        document.getElementById("loginBox").classList.add("hidden");
+        document.getElementById("adminPanel").classList.remove("hidden");
+        renderStaff();
+    } else {
+        let user = staff.find(s=>s.mobile==m);
+        if(user && user.deleted){
+            alert("Your account is deleted");
+        }
+    }
+}
+
+// ADD STAFF
+function addStaff(){
+    let name = document.getElementById("name").value;
+    let mobile = document.getElementById("mobile").value;
+
+    if(!name || !mobile){
+        alert("Enter Name & Mobile");
+        return;
+    }
+
+    staff.push({name,mobile,deleted:false});
+    saveData();
+    renderStaff();
+}
+
+// RENDER STAFF (DELETE BUTTON FIXED)
+function renderStaff(){
+    let html="<tr><th>Name</th><th>Mobile</th><th>Action</th></tr>";
+
+    staff.forEach((s,i)=>{
+        if(!s.deleted){
+            html+=`
+            <tr>
+            <td>${s.name}</td>
+            <td>${s.mobile}</td>
+            <td>
+                <button onclick="deleteStaff(${i})">Delete</button>
+            </td>
+            </tr>`;
+        }
+    });
+
+    document.getElementById("staffTable").innerHTML=html;
+    renderAttendance();
+}
+
+// DELETE STAFF
+function deleteStaff(i){
+    staff[i].deleted = true;
+    saveData();
+    renderStaff();
+}
+
+// ATTENDANCE
+function renderAttendance(){
+    let html="<tr><th>Name</th><th>Status</th></tr>";
+
+    staff.forEach((s,i)=>{
+        if(!s.deleted){
+            html+=`
+            <tr>
+            <td>${s.name}</td>
+            <td>
+            <select id="att_${i}">
+            <option value="present">Present</option>
+            <option value="absent">Absent</option>
+            </select>
+            </td>
+            </tr>`;
+        }
+    });
+
+    document.getElementById("attTable").innerHTML=html;
+}
+
+function saveAttendance(){
+    let date=document.getElementById("attDate").value;
+
+    if(!date){
+        alert("Select date");
+        return;
+    }
+
+    staff.forEach((s,i)=>{
+        if(!s.deleted){
+            let status=document.getElementById("att_"+i).value;
+            attendance.push({mobile:s.mobile,date,status});
+        }
+    });
+
+    saveData();
+    alert("Attendance Saved");
+}
+
+// ATTENDANCE REPORT
+function showAttendance(){
+
+    let report="";
+
+    staff.forEach(s=>{
+        if(!s.deleted){
+
+            let present = attendance.filter(a=>a.mobile==s.mobile && a.status=="present").map(a=>a.date);
+            let absent = attendance.filter(a=>a.mobile==s.mobile && a.status=="absent").map(a=>a.date);
+
+            report+=`
+            <div>
+            <b>${s.name}</b><br>
+            ✅ Present: ${present.join(", ") || "None"}<br>
+            ❌ Absent: ${absent.join(", ") || "None"}
+            </div><br>`;
+        }
+    });
+
+    document.getElementById("attendanceReport").innerHTML = report || "No Data";
+}
+
+// ADD JOB
+function addJob(){
+    let date=document.getElementById("jobDate").value;
+    let jobName=document.getElementById("jobName").value;
+    let qty=document.getElementById("qty").value;
+    let rate=document.getElementById("rate").value;
+
+    if(!date || !jobName){
+        alert("Fill all fields");
+        return;
+    }
+
+    let total=qty*rate;
+
+    jobs.push({id:Date.now(),date,jobName,qty,rate,total});
+    saveData();
+    showJobs();
+}
+
+// GROUPED JOB VIEW + DELETE
+function showJobs(){
+
+    let grouped={};
+
+    jobs.forEach(j=>{
+        if(!grouped[j.date]){
+            grouped[j.date]=[];
+        }
+        grouped[j.date].push(j);
+    });
+
+    let html="";
+
+    for(let date in grouped){
+
+        html+=`<div style="border:2px solid #000; padding:10px; margin:10px 0;">
+        <h3>📅 ${date}</h3>`;
+
+        grouped[date].forEach(j=>{
+            html+=`
+            <div style="border:1px solid #ccc; padding:8px; margin:5px;">
+            Job: ${j.jobName}<br>
+            Qty: ${j.qty} | Rate: ${j.rate}<br>
+            Total: ₹${j.total}<br>
+            <button onclick="deleteJob(${j.id})">Delete</button>
+            </div>`;
+        });
+
+        html+=`</div>`;
+    }
+
+    document.getElementById("jobReport").innerHTML = html || "No Jobs";
+}
+
+// DELETE JOB
+function deleteJob(id){
+    jobs = jobs.filter(j=>j.id!==id);
+    saveData();
+    showJobs();
+}
+
+// SAVE
+function saveData(){
+    localStorage.setItem("staff", JSON.stringify(staff));
+    localStorage.setItem("attendance", JSON.stringify(attendance));
+    localStorage.setItem("jobs", JSON.stringify(jobs));
+}
+
+// LOGOUT
+function logout(){
+    location.reload();
+}
+
+</script>
+
+</body>
+</html>
